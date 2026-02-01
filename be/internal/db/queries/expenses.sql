@@ -61,8 +61,8 @@ SET deleted_at = CURRENT_TIMESTAMP
 WHERE expense_id = $1 AND deleted_at IS NULL;
 
 -- name: CreateExpenseSplit :one
-INSERT INTO expense_split (expense_id, user_id, pending_user_id, amount_owned, split_type)
-VALUES ($1, $2, $3, $4, $5) RETURNING *;
+INSERT INTO expense_split (expense_id, user_id, pending_user_id, amount_owned, split_type, share_value)
+VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
 
 -- name: ListExpenseSplits :many
 SELECT
@@ -72,6 +72,7 @@ SELECT
     es.pending_user_id,
     es.amount_owned,
     es.split_type,
+    es.share_value,
     es.created_at,
     es.updated_at,
     u.email AS user_email,

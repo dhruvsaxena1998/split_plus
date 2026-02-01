@@ -26,9 +26,11 @@ type RecurringPaymentInput struct {
 }
 
 type RecurringSplitInput struct {
-	UserID      pgtype.UUID
-	AmountOwned string
-	SplitType   string
+	UserID     pgtype.UUID
+	Type       string
+	Percentage *string
+	Shares     *int
+	Amount     *string
 }
 
 type CreateRecurringExpenseInput struct {
@@ -122,30 +124,6 @@ func (s *recurringExpenseService) validatePaymentsTotal(expenseAmount string, pa
 	return nil
 }
 
-func (s *recurringExpenseService) validateSplitsTotal(expenseAmount string, splits []SplitInput) error {
-	expenseDecimal, err := decimal.NewFromString(expenseAmount)
-	if err != nil {
-		return ErrInvalidAmount
-	}
-
-	var total decimal.Decimal
-	for _, split := range splits {
-		amount, err := decimal.NewFromString(split.AmountOwned)
-		if err != nil {
-			return ErrInvalidAmount
-		}
-		if amount.LessThan(decimal.Zero) {
-			return ErrInvalidAmount
-		}
-		total = total.Add(amount)
-	}
-
-	if !total.Equal(expenseDecimal) {
-		return ErrSplitTotalMismatch
-	}
-
-	return nil
-}
 
 func (s *recurringExpenseService) validateIntervalFields(interval string, dayOfMonth, dayOfWeek *int) error {
 	switch interval {
@@ -343,25 +321,26 @@ func (s *recurringExpenseService) CreateRecurringExpense(ctx context.Context, in
 		}
 	}
 
-	// Validate and create splits
-	if len(input.Splits) == 0 {
-		return sqlc.RecurringExpense{}, errors.New("at least one split is required")
-	}
-	if err := s.validateSplitsTotal(input.Amount, convertRecurringSplits(input.Splits)); err != nil {
+	// Calculate split amounts
+	calculatedSplits, err := calculateSplitAmounts(input.Amount, convertRecurringSplits(input.Splits))
+	if err != nil {
 		return sqlc.RecurringExpense{}, err
 	}
 
-	for _, splitInput := range input.Splits {
-		splitAmount, err := stringToNumeric(splitInput.AmountOwned)
+	for _, calcSplit := range calculatedSplits {
+		splitAmount, err := stringToNumeric(calcSplit.Amount)
 		if err != nil {
 			return sqlc.RecurringExpense{}, ErrInvalidAmount
 		}
 
+		// Note: recurring_expense_splits doesn't have share_value column yet
+		// For now we just store the calculated amount and type
+
 		_, err = txRepo.CreateRecurringExpenseSplit(ctx, sqlc.CreateRecurringExpenseSplitParams{
 			RecurringExpenseID: recurringExpense.ID,
-			UserID:             splitInput.UserID,
+			UserID:             calcSplit.UserID,
 			AmountOwned:        splitAmount,
-			SplitType:          splitInput.SplitType,
+			SplitType:          calcSplit.Type,
 		})
 		if err != nil {
 			return sqlc.RecurringExpense{}, err
@@ -391,9 +370,12 @@ func convertRecurringSplits(splits []RecurringSplitInput) []SplitInput {
 	result := make([]SplitInput, len(splits))
 	for i, s := range splits {
 		result[i] = SplitInput{
-			UserID:      s.UserID,
-			AmountOwned: s.AmountOwned,
-			SplitType:   s.SplitType,
+			UserID:        s.UserID,
+			PendingUserID: nil,
+			Type:          s.Type,
+			Percentage:    s.Percentage,
+			Shares:        s.Shares,
+			Amount:        s.Amount,
 		}
 	}
 	return result
@@ -575,9 +557,12 @@ func (s *recurringExpenseService) GenerateExpenseFromRecurring(ctx context.Conte
 	for i, s := range splitRows {
 		amountStr, _ := numericToString(s.AmountOwned)
 		splits[i] = SplitInput{
-			UserID:      s.UserID,
-			AmountOwned: amountStr,
-			SplitType:   s.SplitType,
+			UserID:        s.UserID,
+			PendingUserID: nil,
+			Type:          s.SplitType,
+			Percentage:    nil,
+			Shares:        nil,
+			Amount:        &amountStr, // Use the stored amount from recurring expense
 		}
 	}
 

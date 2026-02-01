@@ -6,16 +6,17 @@ import (
 
 	"github.com/dhruvsaxena1998/splitplus/internal/http/handlers"
 	"github.com/dhruvsaxena1998/splitplus/internal/http/middleware"
+	"github.com/dhruvsaxena1998/splitplus/internal/repository"
 	"github.com/dhruvsaxena1998/splitplus/internal/service"
 )
 
-func WithExpenseRoutes(expenseService service.ExpenseService) Option {
+func WithExpenseRoutes(expenseService service.ExpenseService, jwtService service.JWTService, sessionRepo repository.SessionRepository) Option {
 	return optionFunc(func(r chi.Router) {
 		v := validator.New()
 
 		// All expense routes require authentication
 		r.Route("/groups/{group_id}/expenses", func(r chi.Router) {
-			r.Use(middleware.RequireAuth)
+			r.Use(middleware.RequireAuth(jwtService, sessionRepo))
 
 			// GET /groups/{group_id}/expenses - List all expenses for a group
 			r.Get("/", handlers.ListExpensesHandler(expenseService))

@@ -109,11 +109,9 @@ func (s *friendExpenseService) CreateFriendExpense(ctx context.Context, creatorI
 		return CreateExpenseResult{}, err
 	}
 
-	// Validate splits
-	if len(input.Splits) == 0 {
-		return CreateExpenseResult{}, errors.New("at least one split is required")
-	}
-	if err := s.validateSplitsTotal(input.Amount, input.Splits); err != nil {
+	// Calculate split amounts
+	calculatedSplits, err := calculateSplitAmounts(input.Amount, input.Splits)
+	if err != nil {
 		return CreateExpenseResult{}, err
 	}
 
@@ -177,20 +175,29 @@ func (s *friendExpenseService) CreateFriendExpense(ctx context.Context, creatorI
 		payments = append(payments, payment)
 	}
 
-	// Create splits
-	splits := make([]sqlc.ExpenseSplit, 0, len(input.Splits))
-	for _, splitInput := range input.Splits {
-		splitAmount, err := stringToNumeric(splitInput.AmountOwned)
+	// Create splits using calculated amounts
+	splits := make([]sqlc.ExpenseSplit, 0, len(calculatedSplits))
+	for _, calcSplit := range calculatedSplits {
+		splitAmount, err := stringToNumeric(calcSplit.Amount)
 		if err != nil {
 			return CreateExpenseResult{}, ErrInvalidAmount
 		}
 
+		var shareValue pgtype.Numeric
+		if calcSplit.ShareValue != nil {
+			shareValue, err = stringToNumeric(*calcSplit.ShareValue)
+			if err != nil {
+				return CreateExpenseResult{}, ErrInvalidAmount
+			}
+		}
+
 		split, err := txRepo.CreateExpenseSplit(ctx, sqlc.CreateExpenseSplitParams{
 			ExpenseID:     expense.ID,
-			UserID:        splitInput.UserID,
+			UserID:        calcSplit.UserID,
 			PendingUserID: pgtype.UUID{Valid: false},
 			AmountOwned:   splitAmount,
-			SplitType:     splitInput.SplitType,
+			SplitType:     calcSplit.Type,
+			ShareValue:    shareValue,
 		})
 		if err != nil {
 			return CreateExpenseResult{}, err
@@ -310,27 +317,3 @@ func (s *friendExpenseService) validatePaymentsTotal(expenseAmount string, payme
 	return nil
 }
 
-func (s *friendExpenseService) validateSplitsTotal(expenseAmount string, splits []SplitInput) error {
-	expenseDecimal, err := decimal.NewFromString(expenseAmount)
-	if err != nil {
-		return ErrInvalidAmount
-	}
-
-	var total decimal.Decimal
-	for _, split := range splits {
-		amount, err := decimal.NewFromString(split.AmountOwned)
-		if err != nil {
-			return ErrInvalidAmount
-		}
-		if amount.LessThan(decimal.Zero) {
-			return ErrInvalidAmount
-		}
-		total = total.Add(amount)
-	}
-
-	if !total.Equal(expenseDecimal) {
-		return ErrSplitTotalMismatch
-	}
-
-	return nil
-}

@@ -65,9 +65,12 @@ func CreateFriendExpenseHandler(friendExpenseService service.FriendExpenseServic
 				return
 			}
 			splits[i] = service.SplitInput{
-				UserID:      splitUserID,
-				AmountOwned: s.AmountOwned,
-				SplitType:   s.SplitType,
+				UserID:        splitUserID,
+				PendingUserID: nil,
+				Type:          s.Type,
+				Percentage:    s.Percentage,
+				Shares:        s.Shares,
+				Amount:        s.Amount,
 			}
 		}
 

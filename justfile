@@ -152,6 +152,16 @@ go-tidy:
     @echo "Tidying dependencies..."
     cd be && go mod tidy
 
+# Format Go code
+be-fmt:
+    @echo "Formatting Go code..."
+    cd be && go fmt ./...
+
+# Lint Go code
+be-lint:
+    @echo "Linting Go code..."
+    cd be && go vet ./...
+
 # ============================================================================
 # TanStack Start Commands (Local - fe/)
 # ============================================================================

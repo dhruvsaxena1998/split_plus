@@ -72,6 +72,8 @@ type ExpenseSplit struct {
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt     pgtype.Timestamptz `json:"deleted_at"`
 	PendingUserID pgtype.UUID        `json:"pending_user_id"`
+	// For percentage splits: the percentage value (0-100). For shares splits: the share count. NULL for equal/fixed/custom.
+	ShareValue pgtype.Numeric `json:"share_value"`
 }
 
 type Friendship struct {
@@ -187,6 +189,17 @@ type RecurringExpenseSplit struct {
 	DeletedAt          pgtype.Timestamptz `json:"deleted_at"`
 }
 
+type Session struct {
+	ID               pgtype.UUID        `json:"id"`
+	UserID           pgtype.UUID        `json:"user_id"`
+	RefreshTokenHash string             `json:"refresh_token_hash"`
+	UserAgent        pgtype.Text        `json:"user_agent"`
+	IpAddress        pgtype.Text        `json:"ip_address"`
+	ExpiresAt        pgtype.Timestamptz `json:"expires_at"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	LastUsedAt       pgtype.Timestamptz `json:"last_used_at"`
+}
+
 type Settlement struct {
 	ID                   pgtype.UUID        `json:"id"`
 	GroupID              pgtype.UUID        `json:"group_id"`
@@ -205,6 +218,15 @@ type Settlement struct {
 	UpdatedBy            pgtype.UUID        `json:"updated_by"`
 	DeletedAt            pgtype.Timestamptz `json:"deleted_at"`
 	Type                 string             `json:"type"`
+}
+
+type TokenBlacklist struct {
+	ID            pgtype.UUID        `json:"id"`
+	TokenJti      string             `json:"token_jti"`
+	UserID        pgtype.UUID        `json:"user_id"`
+	ExpiresAt     pgtype.Timestamptz `json:"expires_at"`
+	BlacklistedAt pgtype.Timestamptz `json:"blacklisted_at"`
+	Reason        pgtype.Text        `json:"reason"`
 }
 
 type User struct {

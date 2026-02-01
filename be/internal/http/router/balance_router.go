@@ -5,14 +5,15 @@ import (
 
 	"github.com/dhruvsaxena1998/splitplus/internal/http/handlers"
 	"github.com/dhruvsaxena1998/splitplus/internal/http/middleware"
+	"github.com/dhruvsaxena1998/splitplus/internal/repository"
 	"github.com/dhruvsaxena1998/splitplus/internal/service"
 )
 
-func WithBalanceRoutes(balanceService service.BalanceService) Option {
+func WithBalanceRoutes(balanceService service.BalanceService, jwtService service.JWTService, sessionRepo repository.SessionRepository) Option {
 	return optionFunc(func(r chi.Router) {
 		// All balance routes require authentication
 		r.Route("/groups/{group_id}/balances", func(r chi.Router) {
-			r.Use(middleware.RequireAuth)
+			r.Use(middleware.RequireAuth(jwtService, sessionRepo))
 
 			// GET /groups/{group_id}/balances - List all balances in group
 			r.Get("/", handlers.ListGroupBalancesHandler(balanceService))
@@ -23,13 +24,13 @@ func WithBalanceRoutes(balanceService service.BalanceService) Option {
 
 		// GET /groups/{group_id}/debts - Get simplified "who owes whom" view
 		r.Route("/groups/{group_id}/debts", func(r chi.Router) {
-			r.Use(middleware.RequireAuth)
+			r.Use(middleware.RequireAuth(jwtService, sessionRepo))
 			r.Get("/", handlers.GetSimplifiedDebtsHandler(balanceService))
 		})
 
 		// GET /users/me/balances - Get user's balances across all groups
 		r.Route("/users/me/balances", func(r chi.Router) {
-			r.Use(middleware.RequireAuth)
+			r.Use(middleware.RequireAuth(jwtService, sessionRepo))
 			r.Get("/", handlers.GetOverallUserBalanceHandler(balanceService))
 		})
 	})

@@ -6,16 +6,17 @@ import (
 
 	"github.com/dhruvsaxena1998/splitplus/internal/http/handlers"
 	"github.com/dhruvsaxena1998/splitplus/internal/http/middleware"
+	"github.com/dhruvsaxena1998/splitplus/internal/repository"
 	"github.com/dhruvsaxena1998/splitplus/internal/service"
 )
 
-func WithRecurringExpenseRoutes(recurringExpenseService service.RecurringExpenseService) Option {
+func WithRecurringExpenseRoutes(recurringExpenseService service.RecurringExpenseService, jwtService service.JWTService, sessionRepo repository.SessionRepository) Option {
 	return optionFunc(func(r chi.Router) {
 		v := validator.New()
 
 		// All recurring expense routes require authentication
 		r.Route("/groups/{group_id}/recurring-expenses", func(r chi.Router) {
-			r.Use(middleware.RequireAuth)
+			r.Use(middleware.RequireAuth(jwtService, sessionRepo))
 
 			// GET /groups/{group_id}/recurring-expenses - List all recurring expenses for a group
 			r.Get("/", handlers.ListRecurringExpensesHandler(recurringExpenseService))

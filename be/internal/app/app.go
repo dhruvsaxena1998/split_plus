@@ -3,6 +3,7 @@ package app
 import (
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -18,6 +19,7 @@ type App struct {
 
 	// repositories
 	userRepository             repository.UserRepository
+	sessionRepository          repository.SessionRepository
 	friendRepository           repository.FriendRepository
 	groupRepository            repository.GroupRepository
 	expenseRepository          repository.ExpenseRepository
@@ -32,6 +34,8 @@ type App struct {
 
 	// services
 	userService             service.UserService
+	jwtService              service.JWTService
+	authService             service.AuthService
 	friendService           service.FriendService
 	friendExpenseService    service.FriendExpenseService
 	friendSettlementService service.FriendSettlementService
@@ -46,11 +50,12 @@ type App struct {
 	groupInvitationService  service.GroupInvitationService
 }
 
-func New(pool *pgxpool.Pool, queries *sqlc.Queries) *App {
+func New(pool *pgxpool.Pool, queries *sqlc.Queries, jwtSecret string, accessTokenExpiry, refreshTokenExpiry time.Duration) *App {
 	app := &App{}
 
 	// initialize repositories
 	app.userRepository = repository.NewUserRepository(queries)
+	app.sessionRepository = repository.NewSessionRepository(queries)
 	app.friendRepository = repository.NewFriendRepository(queries)
 	app.groupRepository = repository.NewGroupRepository(pool, queries)
 	app.expenseRepository = repository.NewExpenseRepository(pool, queries)
@@ -67,6 +72,8 @@ func New(pool *pgxpool.Pool, queries *sqlc.Queries) *App {
 	app.groupActivityService = service.NewGroupActivityService(app.groupActivityRepository) // Initialize early for dependencies
 
 	app.userService = service.NewUserService(app.userRepository)
+	app.jwtService = service.NewJWTService(jwtSecret, accessTokenExpiry, refreshTokenExpiry)
+	app.authService = service.NewAuthService(app.userService, app.sessionRepository, app.jwtService, accessTokenExpiry, refreshTokenExpiry)
 	app.friendService = service.NewFriendService(app.friendRepository)
 	app.friendExpenseService = service.NewFriendExpenseService(app.expenseRepository, app.friendRepository)
 	app.friendSettlementService = service.NewFriendSettlementService(app.settlementRepository, app.friendRepository)
@@ -81,16 +88,17 @@ func New(pool *pgxpool.Pool, queries *sqlc.Queries) *App {
 
 	// initialize router
 	app.Router = router.New(
+		router.WithAuthRoutes(app.authService, app.jwtService, app.sessionRepository),
 		router.WithUserRoutes(app.userService),
-		router.WithFriendRoutes(app.friendService, app.friendExpenseService, app.friendSettlementService),
-		router.WithGroupRoutes(app.groupService, app.groupInvitationService),
-		router.WithExpenseRoutes(app.expenseService),
-		router.WithExpenseCategoryRoutes(app.expenseCategoryService),
-		router.WithExpenseCommentRoutes(app.expenseCommentService),
-		router.WithGroupActivityRoutes(app.groupActivityService),
-		router.WithBalanceRoutes(app.balanceService),
-		router.WithSettlementRoutes(app.settlementService),
-		router.WithRecurringExpenseRoutes(app.recurringExpenseService),
+		router.WithFriendRoutes(app.friendService, app.friendExpenseService, app.friendSettlementService, app.jwtService, app.sessionRepository),
+		router.WithGroupRoutes(app.groupService, app.groupInvitationService, app.jwtService, app.sessionRepository),
+		router.WithExpenseRoutes(app.expenseService, app.jwtService, app.sessionRepository),
+		router.WithExpenseCategoryRoutes(app.expenseCategoryService, app.jwtService, app.sessionRepository),
+		router.WithExpenseCommentRoutes(app.expenseCommentService, app.jwtService, app.sessionRepository),
+		router.WithGroupActivityRoutes(app.groupActivityService, app.jwtService, app.sessionRepository),
+		router.WithBalanceRoutes(app.balanceService, app.jwtService, app.sessionRepository),
+		router.WithSettlementRoutes(app.settlementService, app.jwtService, app.sessionRepository),
+		router.WithRecurringExpenseRoutes(app.recurringExpenseService, app.jwtService, app.sessionRepository),
 	)
 
 	// debug - dev only

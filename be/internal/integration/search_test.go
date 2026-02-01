@@ -85,9 +85,9 @@ func TestSearchExpenses(t *testing.T) {
 		CategoryID: foodCatID,
 		Payments: []paymentPayload{{UserID: userA.ID, Amount: "50.00"}},
 		Splits: []splitPayload{
-			{UserID: userA.ID, AmountOwned: "16.66", SplitType: "equal"},
-			{UserID: userB.ID, AmountOwned: "16.67", SplitType: "equal"},
-			{UserID: userC.ID, AmountOwned: "16.67", SplitType: "equal"},
+			{UserID: userA.ID, Type: "equal"},
+			{UserID: userB.ID, Type: "equal"},
+			{UserID: userC.ID, Type: "equal"},
 		},
 	})
 
@@ -100,9 +100,9 @@ func TestSearchExpenses(t *testing.T) {
 		CategoryID: foodCatID,
 		Payments: []paymentPayload{{UserID: userB.ID, Amount: "100.00"}},
 		Splits: []splitPayload{
-			{UserID: userA.ID, AmountOwned: "33.33", SplitType: "equal"},
-			{UserID: userB.ID, AmountOwned: "33.33", SplitType: "equal"},
-			{UserID: userC.ID, AmountOwned: "33.34", SplitType: "equal"},
+			{UserID: userA.ID, Type: "equal"},
+			{UserID: userB.ID, Type: "equal"},
+			{UserID: userC.ID, Type: "equal"},
 		},
 	})
 
@@ -114,9 +114,9 @@ func TestSearchExpenses(t *testing.T) {
 		CategoryID: entCatID,
 		Payments: []paymentPayload{{UserID: userA.ID, Amount: "30.00"}},
 		Splits: []splitPayload{
-			{UserID: userA.ID, AmountOwned: "10.00", SplitType: "equal"},
-			{UserID: userB.ID, AmountOwned: "10.00", SplitType: "equal"},
-			{UserID: userC.ID, AmountOwned: "10.00", SplitType: "equal"},
+			{UserID: userA.ID, Type: "equal"},
+			{UserID: userB.ID, Type: "equal"},
+			{UserID: userC.ID, Type: "equal"},
 		},
 	})
 
@@ -127,9 +127,9 @@ func TestSearchExpenses(t *testing.T) {
 		Date:   "2024-01-04",
 		Payments: []paymentPayload{{UserID: userC.ID, Amount: "20.00"}},
 		Splits: []splitPayload{
-			{UserID: userA.ID, AmountOwned: "6.66", SplitType: "equal"},
-			{UserID: userB.ID, AmountOwned: "6.67", SplitType: "equal"},
-			{UserID: userC.ID, AmountOwned: "6.67", SplitType: "equal"},
+			{UserID: userA.ID, Type: "equal"},
+			{UserID: userB.ID, Type: "equal"},
+			{UserID: userC.ID, Type: "equal"},
 		},
 	})
 

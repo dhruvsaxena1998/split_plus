@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -52,7 +53,8 @@ func setupTestDB(t *testing.T) (*pgxpool.Pool, *sqlc.Queries) {
 
 func setupServer(t *testing.T, pool *pgxpool.Pool, queries *sqlc.Queries) *httptest.Server {
 	t.Helper()
-	a := app.New(pool, queries)
+	// Use test values for JWT config
+	a := app.New(pool, queries, "test-secret-key-32-chars-long-for-tests", 15*time.Minute, 24*time.Hour)
 	return httptest.NewServer(a.Router)
 }
 
@@ -114,8 +116,8 @@ func (h *testHarness) doJSON(method, path string, body any, headers map[string]s
 	return resp.StatusCode, sr
 }
 
-func (h *testHarness) authHeader(userID string) map[string]string {
+func (h *testHarness) authHeader(accessToken string) map[string]string {
 	return map[string]string{
-		"X-User-ID": userID,
+		"Authorization": "Bearer " + accessToken,
 	}
 }

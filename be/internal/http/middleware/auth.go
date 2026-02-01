@@ -3,12 +3,16 @@ package middleware
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/dhruvsaxena1998/splitplus/internal/http/response"
+	"github.com/dhruvsaxena1998/splitplus/internal/repository"
+	"github.com/dhruvsaxena1998/splitplus/internal/service"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type userIDKey struct{}
+type jtiKey struct{}
 
 // SetUserID sets the authenticated user ID in the request context
 func SetUserID(ctx context.Context, userID pgtype.UUID) context.Context {
@@ -21,46 +25,127 @@ func GetUserID(r *http.Request) (pgtype.UUID, bool) {
 	return userID, ok
 }
 
-// RequireAuth is a middleware that ensures the user is authenticated
-// For now, this is a placeholder using X-User-ID header for testing
-// TODO: Replace with actual JWT validation
-func RequireAuth(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		userIDStr := r.Header.Get("X-User-ID")
-		if userIDStr == "" {
-			response.SendError(w, http.StatusUnauthorized, "unauthorized")
-			return
-		}
+// SetJTI sets the JWT ID in the request context
+func SetJTI(ctx context.Context, jti string) context.Context {
+	return context.WithValue(ctx, jtiKey{}, jti)
+}
 
-		var userID pgtype.UUID
-		if err := userID.Scan(userIDStr); err != nil {
-			response.SendError(w, http.StatusUnauthorized, "invalid user id")
-			return
-		}
+// GetJTI retrieves the JWT ID from the request context
+func GetJTI(r *http.Request) (string, bool) {
+	jti, ok := r.Context().Value(jtiKey{}).(string)
+	return jti, ok
+}
 
-		ctx := SetUserID(r.Context(), userID)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+// RequireAuth is a middleware that ensures the user is authenticated via JWT
+func RequireAuth(jwtService service.JWTService, sessionRepo repository.SessionRepository) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Extract token from Authorization header
+			authHeader := r.Header.Get("Authorization")
+			if authHeader == "" {
+				response.SendError(w, http.StatusUnauthorized, "missing authorization header")
+				return
+			}
+
+			// Check if it's a Bearer token
+			parts := strings.SplitN(authHeader, " ", 2)
+			if len(parts) != 2 || parts[0] != "Bearer" {
+				response.SendError(w, http.StatusUnauthorized, "invalid authorization header format")
+				return
+			}
+
+			tokenString := parts[1]
+
+			// Validate JWT token
+			claims, err := jwtService.ValidateAccessToken(tokenString)
+			if err != nil {
+				var message string
+				switch err {
+				case service.ErrExpiredToken:
+					message = "token has expired"
+				case service.ErrInvalidToken:
+					message = "invalid token"
+				default:
+					message = "unauthorized"
+				}
+				response.SendError(w, http.StatusUnauthorized, message)
+				return
+			}
+
+			// Check if token is blacklisted
+			isBlacklisted, err := sessionRepo.IsTokenBlacklisted(r.Context(), claims.ID)
+			if err != nil {
+				response.SendError(w, http.StatusInternalServerError, "authentication error")
+				return
+			}
+
+			if isBlacklisted {
+				response.SendError(w, http.StatusUnauthorized, "token has been revoked")
+				return
+			}
+
+			// Parse user ID from claims
+			var userID pgtype.UUID
+			if err := userID.Scan(claims.UserID); err != nil {
+				response.SendError(w, http.StatusUnauthorized, "invalid user id in token")
+				return
+			}
+
+			// Set user ID and JTI in context
+			ctx := SetUserID(r.Context(), userID)
+			ctx = SetJTI(ctx, claims.ID)
+
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
 }
 
 // ParseAuth is a middleware that parses the authenticated user ID but doesn't require it
-func ParseAuth(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		userIDStr := r.Header.Get("X-User-ID")
-		if userIDStr == "" {
-			next.ServeHTTP(w, r)
-			return
-		}
+func ParseAuth(jwtService service.JWTService, sessionRepo repository.SessionRepository) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			authHeader := r.Header.Get("Authorization")
+			if authHeader == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
 
-		var userID pgtype.UUID
-		if err := userID.Scan(userIDStr); err != nil {
-			// If provided but invalid, we ignore it for now or could error.
-			// Given it's "optional", ignoring it is safer for public routes.
-			next.ServeHTTP(w, r)
-			return
-		}
+			parts := strings.SplitN(authHeader, " ", 2)
+			if len(parts) != 2 || parts[0] != "Bearer" {
+				next.ServeHTTP(w, r)
+				return
+			}
 
-		ctx := SetUserID(r.Context(), userID)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+			tokenString := parts[1]
+
+			// Validate JWT token
+			claims, err := jwtService.ValidateAccessToken(tokenString)
+			if err != nil {
+				// Invalid token, but we don't error on optional auth
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Check if token is blacklisted
+			isBlacklisted, err := sessionRepo.IsTokenBlacklisted(r.Context(), claims.ID)
+			if err != nil || isBlacklisted {
+				// Blacklisted or error, but we don't error on optional auth
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Parse user ID from claims
+			var userID pgtype.UUID
+			if err := userID.Scan(claims.UserID); err != nil {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Set user ID and JTI in context
+			ctx := SetUserID(r.Context(), userID)
+			ctx = SetJTI(ctx, claims.ID)
+
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
 }

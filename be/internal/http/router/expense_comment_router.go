@@ -6,16 +6,17 @@ import (
 
 	"github.com/dhruvsaxena1998/splitplus/internal/http/handlers"
 	"github.com/dhruvsaxena1998/splitplus/internal/http/middleware"
+	"github.com/dhruvsaxena1998/splitplus/internal/repository"
 	"github.com/dhruvsaxena1998/splitplus/internal/service"
 )
 
-func WithExpenseCommentRoutes(commentService service.ExpenseCommentService) Option {
+func WithExpenseCommentRoutes(commentService service.ExpenseCommentService, jwtService service.JWTService, sessionRepo repository.SessionRepository) Option {
 	return optionFunc(func(r chi.Router) {
 		v := validator.New()
 
 		// Routes for accessing comments via group->expense hierarchy
 		r.Route("/groups/{group_id}/expenses/{expense_id}/comments", func(r chi.Router) {
-			r.Use(middleware.RequireAuth)
+			r.Use(middleware.RequireAuth(jwtService, sessionRepo))
 
 			// GET / - List comments
 			r.Get("/", handlers.ListCommentsHandler(commentService))

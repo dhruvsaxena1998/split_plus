@@ -179,7 +179,7 @@ func TestRecurringExpenseService_CreateRecurringExpense(t *testing.T) {
 					{UserID: userID, Amount: "5.00", PaymentMethod: "card"},
 				},
 				Splits: []RecurringSplitInput{
-					{UserID: userID, AmountOwned: "5.00", SplitType: "equal"},
+					{UserID: userID, Type: "equal"},
 				},
 			},
 			mockSetup: func(repo *MockRecurringExpenseRepository, expenseRepo *MockExpenseRepository) {
@@ -235,7 +235,7 @@ func TestRecurringExpenseService_CreateRecurringExpense(t *testing.T) {
 					{UserID: userID, Amount: "9.99"},
 				},
 				Splits: []RecurringSplitInput{
-					{UserID: userID, AmountOwned: "9.99", SplitType: "equal"},
+					{UserID: userID, Type: "equal"},
 				},
 			},
 			mockSetup: func(repo *MockRecurringExpenseRepository, expenseRepo *MockExpenseRepository) {
@@ -271,7 +271,7 @@ func TestRecurringExpenseService_CreateRecurringExpense(t *testing.T) {
 				StartDate:      startDate,
 				CreatedBy:      userID,
 				Payments:       []RecurringPaymentInput{{UserID: userID, Amount: "10.00"}},
-				Splits:         []RecurringSplitInput{{UserID: userID, AmountOwned: "10.00"}},
+				Splits:         []RecurringSplitInput{{UserID: userID, Type: "equal"}},
 			},
 			mockSetup: func(repo *MockRecurringExpenseRepository, expenseRepo *MockExpenseRepository) {
 				repo.GetGroupByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Group, error) {
@@ -294,7 +294,7 @@ func TestRecurringExpenseService_CreateRecurringExpense(t *testing.T) {
 				StartDate:      startDate,
 				CreatedBy:      userID,
 				Payments:       []RecurringPaymentInput{{UserID: userID, Amount: "10.00"}},
-				Splits:         []RecurringSplitInput{{UserID: userID, AmountOwned: "10.00"}},
+				Splits:         []RecurringSplitInput{{UserID: userID, Type: "equal"}},
 			},
 			mockSetup: func(repo *MockRecurringExpenseRepository, expenseRepo *MockExpenseRepository) {
 				repo.GetGroupByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Group, error) {
@@ -316,7 +316,7 @@ func TestRecurringExpenseService_CreateRecurringExpense(t *testing.T) {
 				StartDate:      startDate,
 				CreatedBy:      userID,
 				Payments:       []RecurringPaymentInput{{UserID: userID, Amount: "10.00"}},
-				Splits:         []RecurringSplitInput{{UserID: userID, AmountOwned: "10.00"}},
+				Splits:         []RecurringSplitInput{{UserID: userID, Type: "equal"}},
 			},
 			mockSetup: func(repo *MockRecurringExpenseRepository, expenseRepo *MockExpenseRepository) {
 				repo.GetGroupByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Group, error) {
@@ -338,7 +338,7 @@ func TestRecurringExpenseService_CreateRecurringExpense(t *testing.T) {
 				StartDate:      startDate,
 				CreatedBy:      userID,
 				Payments:       []RecurringPaymentInput{{UserID: userID, Amount: "10.00"}},
-				Splits:         []RecurringSplitInput{{UserID: userID, AmountOwned: "10.00"}},
+				Splits:         []RecurringSplitInput{{UserID: userID, Type: "equal"}},
 			},
 			mockSetup: func(repo *MockRecurringExpenseRepository, expenseRepo *MockExpenseRepository) {
 				repo.GetGroupByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Group, error) {
@@ -360,7 +360,7 @@ func TestRecurringExpenseService_CreateRecurringExpense(t *testing.T) {
 				StartDate:      startDate,
 				CreatedBy:      userID,
 				Payments:       []RecurringPaymentInput{{UserID: userID, Amount: "10.00"}},
-				Splits:         []RecurringSplitInput{{UserID: userID, AmountOwned: "10.00"}},
+				Splits:         []RecurringSplitInput{{UserID: userID, Type: "equal"}},
 			},
 			mockSetup: func(repo *MockRecurringExpenseRepository, expenseRepo *MockExpenseRepository) {
 				repo.GetGroupByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Group, error) {

@@ -6,16 +6,17 @@ import (
 
 	"github.com/dhruvsaxena1998/splitplus/internal/http/handlers"
 	"github.com/dhruvsaxena1998/splitplus/internal/http/middleware"
+	"github.com/dhruvsaxena1998/splitplus/internal/repository"
 	"github.com/dhruvsaxena1998/splitplus/internal/service"
 )
 
-func WithGroupRoutes(groupService service.GroupService, invitationService service.GroupInvitationService) Option {
+func WithGroupRoutes(groupService service.GroupService, invitationService service.GroupInvitationService, jwtService service.JWTService, sessionRepo repository.SessionRepository) Option {
 	return optionFunc(func(r chi.Router) {
 		v := validator.New()
 
 		r.Route("/groups", func(r chi.Router) {
 			// All group routes require authentication
-			r.Use(middleware.RequireAuth)
+			r.Use(middleware.RequireAuth(jwtService, sessionRepo))
 
 			// GET /groups - List all groups for the authenticated user
 			r.Get("/", handlers.ListUserGroupsHandler(groupService))
@@ -47,12 +48,12 @@ func WithGroupRoutes(groupService service.GroupService, invitationService servic
 			r.Get("/{token}", handlers.GetInvitationHandler(invitationService))
 
 			// POST /invitations/{token}/accept - Accept invitation (Authenticated)
-			r.With(middleware.RequireAuth).Post("/{token}/accept",
+			r.With(middleware.RequireAuth(jwtService, sessionRepo)).Post("/{token}/accept",
 				handlers.AcceptInvitationHandler(invitationService),
 			)
 
 			// POST /invitations/{token}/join - Smart Join (Public, handles auth/registration internally)
-			r.With(middleware.ParseAuth).Post("/{token}/join", handlers.JoinGroupHandler(invitationService))
+			r.With(middleware.ParseAuth(jwtService, sessionRepo)).Post("/{token}/join", handlers.JoinGroupHandler(invitationService))
 		})
 	})
 }

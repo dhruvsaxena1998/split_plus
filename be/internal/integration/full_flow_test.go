@@ -34,9 +34,9 @@ func TestFullFlow_HappyPath(t *testing.T) {
 			{UserID: userA.ID, Amount: "9.99", PaymentMethod: "card"},
 		},
 		Splits: []splitPayload{
-			{UserID: userA.ID, AmountOwned: "3.33", SplitType: "equal"},
-			{UserID: userB.ID, AmountOwned: "3.33", SplitType: "equal"},
-			{UserID: userC.ID, AmountOwned: "3.33", SplitType: "equal"},
+			{UserID: userA.ID, Type: "equal"},
+			{UserID: userB.ID, Type: "equal"},
+			{UserID: userC.ID, Type: "equal"},
 		},
 	})
 	if expenseID == "" {
@@ -71,8 +71,8 @@ func TestFullFlow_HappyPath(t *testing.T) {
 			{UserID: userA.ID, Amount: "5.00", PaymentMethod: "cash"},
 		},
 		Splits: []splitPayload{
-			{UserID: userA.ID, AmountOwned: "2.50", SplitType: "equal"},
-			{UserID: userB.ID, AmountOwned: "2.50", SplitType: "equal"},
+			{UserID: userA.ID, Type: "equal"},
+			{UserID: userB.ID, Type: "equal"},
 		},
 	})
 
@@ -105,8 +105,8 @@ func TestFriendFlow_HappyPath(t *testing.T) {
 			{UserID: userA.ID, Amount: "10.00", PaymentMethod: "cash"},
 		},
 		Splits: []splitPayload{
-			{UserID: userA.ID, AmountOwned: "5.00", SplitType: "equal"},
-			{UserID: userB.ID, AmountOwned: "5.00", SplitType: "equal"},
+			{UserID: userA.ID, Type: "equal"},
+			{UserID: userB.ID, Type: "equal"},
 		},
 	}
 
@@ -283,9 +283,11 @@ type paymentPayload struct {
 }
 
 type splitPayload struct {
-	UserID      string `json:"user_id"`
-	AmountOwned string `json:"amount_owned"`
-	SplitType   string `json:"split_type,omitempty"`
+	UserID     string  `json:"user_id"`
+	Type       string  `json:"type"`
+	Percentage *string `json:"percentage,omitempty"`
+	Shares     *int    `json:"shares,omitempty"`
+	Amount     *string `json:"amount,omitempty"`
 }
 
 type createExpensePayload struct {
@@ -382,4 +384,90 @@ func createRecurringExpense(t *testing.T, h *testHarness, userID, groupID string
 		t.Fatalf("expected recurring id")
 	}
 	return out.ID
+}
+
+func TestFullFlow_SplitScenarios(t *testing.T) {
+	h := newHarness(t)
+
+	// Users
+	userA := createUser(t, h, "split_a@example.com")
+	userB := createUser(t, h, "split_b@example.com")
+	userC := createUser(t, h, "split_c@example.com")
+
+	// Group
+	groupID := createGroup(t, h, userA.ID, "Split Scenarios", "USD")
+	tokenB := inviteUserToGroup(t, h, userA.ID, groupID, userB.Email)
+	tokenC := inviteUserToGroup(t, h, userA.ID, groupID, userC.Email)
+	joinGroup(t, h, userB.ID, tokenB)
+	joinGroup(t, h, userC.ID, tokenC)
+
+	strPtr := func(s string) *string { return &s }
+	intPtr := func(i int) *int { return &i }
+
+	// 1. Equal Split (already covered in HappyPath, but good for completeness)
+	t.Run("Equal Split", func(t *testing.T) {
+		createExpense(t, h, userA.ID, groupID, createExpensePayload{
+			Title:  "Equal Split",
+			Amount: "30.00",
+			Date:   "2024-02-01",
+			Payments: []paymentPayload{
+				{UserID: userA.ID, Amount: "30.00"},
+			},
+			Splits: []splitPayload{
+				{UserID: userA.ID, Type: "equal"},
+				{UserID: userB.ID, Type: "equal"},
+				{UserID: userC.ID, Type: "equal"},
+			},
+		})
+	})
+
+	// 2. Percentage Split
+	t.Run("Percentage Split", func(t *testing.T) {
+		createExpense(t, h, userA.ID, groupID, createExpensePayload{
+			Title:  "Percentage Split",
+			Amount: "100.00",
+			Date:   "2024-02-01",
+			Payments: []paymentPayload{
+				{UserID: userA.ID, Amount: "100.00"},
+			},
+			Splits: []splitPayload{
+				{UserID: userA.ID, Type: "percentage", Percentage: strPtr("50")},
+				{UserID: userB.ID, Type: "percentage", Percentage: strPtr("30")},
+				{UserID: userC.ID, Type: "percentage", Percentage: strPtr("20")},
+			},
+		})
+	})
+
+	// 3. Shares Split
+	t.Run("Shares Split", func(t *testing.T) {
+		createExpense(t, h, userA.ID, groupID, createExpensePayload{
+			Title:  "Shares Split",
+			Amount: "60.00",
+			Date:   "2024-02-01",
+			Payments: []paymentPayload{
+				{UserID: userA.ID, Amount: "60.00"},
+			},
+			Splits: []splitPayload{
+				{UserID: userA.ID, Type: "shares", Shares: intPtr(1)}, // 1/3 -> 20
+				{UserID: userB.ID, Type: "shares", Shares: intPtr(2)}, // 2/3 -> 40
+			},
+		})
+	})
+
+	// 4. Fixed Split
+	t.Run("Fixed Split", func(t *testing.T) {
+		createExpense(t, h, userA.ID, groupID, createExpensePayload{
+			Title:  "Fixed Split",
+			Amount: "50.00",
+			Date:   "2024-02-01",
+			Payments: []paymentPayload{
+				{UserID: userA.ID, Amount: "50.00"},
+			},
+			Splits: []splitPayload{
+				{UserID: userA.ID, Type: "fixed", Amount: strPtr("10.00")},
+				{UserID: userB.ID, Type: "fixed", Amount: strPtr("15.00")},
+				{UserID: userC.ID, Type: "fixed", Amount: strPtr("25.00")},
+			},
+		})
+	})
 }

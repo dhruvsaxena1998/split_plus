@@ -156,6 +156,10 @@ func (m *MockExpenseRepository) SearchExpenses(ctx context.Context, params sqlc.
 
 var _ repository.ExpenseRepository = (*MockExpenseRepository)(nil)
 
+func strPtr(s string) *string {
+	return &s
+}
+
 func TestExpenseService_CreateExpense(t *testing.T) {
 	userID := testutil.CreateTestUUID(1)
 	otherUserID := testutil.CreateTestUUID(2)
@@ -175,7 +179,7 @@ func TestExpenseService_CreateExpense(t *testing.T) {
 				Date:      time.Now(),
 				CreatedBy: userID,
 				Payments:  []PaymentInput{{UserID: userID, Amount: "100.00"}},
-				Splits:    []SplitInput{{UserID: userID, AmountOwned: "100.00"}},
+				Splits:    []SplitInput{{UserID: userID, Type: "equal"}},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
 				mock.GetGroupByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Group, error) {
@@ -195,7 +199,7 @@ func TestExpenseService_CreateExpense(t *testing.T) {
 				Date:      time.Now(),
 				CreatedBy: userID,
 				Payments:  []PaymentInput{{UserID: userID, Amount: "0"}},
-				Splits:    []SplitInput{{UserID: userID, AmountOwned: "0"}},
+				Splits:    []SplitInput{{UserID: userID, Type: "equal"}},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
 				mock.GetGroupByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Group, error) {
@@ -215,7 +219,7 @@ func TestExpenseService_CreateExpense(t *testing.T) {
 				Date:      time.Now(),
 				CreatedBy: userID,
 				Payments:  []PaymentInput{{UserID: userID, Amount: "-10.00"}},
-				Splits:    []SplitInput{{UserID: userID, AmountOwned: "-10.00"}},
+				Splits:    []SplitInput{{UserID: userID, Type: "equal"}},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
 				mock.GetGroupByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Group, error) {
@@ -235,7 +239,7 @@ func TestExpenseService_CreateExpense(t *testing.T) {
 				Date:      time.Now(),
 				CreatedBy: userID,
 				Payments:  []PaymentInput{{UserID: userID, Amount: "not-a-number"}},
-				Splits:    []SplitInput{{UserID: userID, AmountOwned: "not-a-number"}},
+				Splits:    []SplitInput{{UserID: userID, Type: "equal"}},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
 				mock.GetGroupByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Group, error) {
@@ -255,7 +259,7 @@ func TestExpenseService_CreateExpense(t *testing.T) {
 				Date:      time.Now(),
 				CreatedBy: userID,
 				Payments:  []PaymentInput{},
-				Splits:    []SplitInput{{UserID: userID, AmountOwned: "100.00"}},
+				Splits:    []SplitInput{{UserID: userID, Type: "equal"}},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
 				mock.GetGroupByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Group, error) {
@@ -295,7 +299,7 @@ func TestExpenseService_CreateExpense(t *testing.T) {
 				Date:      time.Now(),
 				CreatedBy: userID,
 				Payments:  []PaymentInput{{UserID: userID, Amount: "50.00"}},
-				Splits:    []SplitInput{{UserID: userID, AmountOwned: "100.00"}},
+				Splits:    []SplitInput{{UserID: userID, Type: "equal"}},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
 				mock.GetGroupByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Group, error) {
@@ -315,7 +319,7 @@ func TestExpenseService_CreateExpense(t *testing.T) {
 				Date:      time.Now(),
 				CreatedBy: userID,
 				Payments:  []PaymentInput{{UserID: userID, Amount: "150.00"}},
-				Splits:    []SplitInput{{UserID: userID, AmountOwned: "100.00"}},
+				Splits:    []SplitInput{{UserID: userID, Type: "equal"}},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
 				mock.GetGroupByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Group, error) {
@@ -335,7 +339,7 @@ func TestExpenseService_CreateExpense(t *testing.T) {
 				Date:      time.Now(),
 				CreatedBy: userID,
 				Payments:  []PaymentInput{{UserID: userID, Amount: "0"}},
-				Splits:    []SplitInput{{UserID: userID, AmountOwned: "100.00"}},
+				Splits:    []SplitInput{{UserID: userID, Type: "equal"}},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
 				mock.GetGroupByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Group, error) {
@@ -355,7 +359,7 @@ func TestExpenseService_CreateExpense(t *testing.T) {
 				Date:      time.Now(),
 				CreatedBy: userID,
 				Payments:  []PaymentInput{{UserID: userID, Amount: "-10.00"}},
-				Splits:    []SplitInput{{UserID: userID, AmountOwned: "100.00"}},
+				Splits:    []SplitInput{{UserID: userID, Type: "equal"}},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
 				mock.GetGroupByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Group, error) {
@@ -375,7 +379,7 @@ func TestExpenseService_CreateExpense(t *testing.T) {
 				Date:      time.Now(),
 				CreatedBy: userID,
 				Payments:  []PaymentInput{{UserID: userID, Amount: "100.00"}},
-				Splits:    []SplitInput{{UserID: userID, AmountOwned: "50.00"}},
+				Splits:    []SplitInput{{UserID: userID, Type: "fixed", Amount: strPtr("50.00")}},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
 				mock.GetGroupByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Group, error) {
@@ -395,7 +399,7 @@ func TestExpenseService_CreateExpense(t *testing.T) {
 				Date:      time.Now(),
 				CreatedBy: userID,
 				Payments:  []PaymentInput{{UserID: userID, Amount: "100.00"}},
-				Splits:    []SplitInput{{UserID: userID, AmountOwned: "150.00"}},
+				Splits:    []SplitInput{{UserID: userID, Type: "fixed", Amount: strPtr("150.00")}},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
 				mock.GetGroupByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Group, error) {
@@ -415,7 +419,7 @@ func TestExpenseService_CreateExpense(t *testing.T) {
 				Date:      time.Now(),
 				CreatedBy: userID,
 				Payments:  []PaymentInput{{UserID: userID, Amount: "100.00"}},
-				Splits:    []SplitInput{{UserID: userID, AmountOwned: "-10.00"}},
+				Splits:    []SplitInput{{UserID: userID, Type: "fixed", Amount: strPtr("-10.00")}},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
 				mock.GetGroupByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Group, error) {
@@ -435,7 +439,7 @@ func TestExpenseService_CreateExpense(t *testing.T) {
 				Date:      time.Now(),
 				CreatedBy: userID,
 				Payments:  []PaymentInput{{UserID: userID, Amount: "100.00"}},
-				Splits:    []SplitInput{{UserID: userID, AmountOwned: "100.00"}},
+				Splits:    []SplitInput{{UserID: userID, Type: "equal"}},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
 				mock.GetGroupByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Group, error) {
@@ -458,8 +462,8 @@ func TestExpenseService_CreateExpense(t *testing.T) {
 					{UserID: userID, Amount: "100.00"},
 				},
 				Splits: []SplitInput{
-					{UserID: userID, AmountOwned: "50.00", SplitType: "equal"},
-					{UserID: otherUserID, AmountOwned: "50.00", SplitType: "equal"},
+					{UserID: userID, Type: "equal"},
+					{UserID: otherUserID, Type: "equal"},
 				},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
@@ -496,8 +500,8 @@ func TestExpenseService_CreateExpense(t *testing.T) {
 				},
 				Splits: []SplitInput{
 					// 60% / 40% split
-					{UserID: userID, AmountOwned: "60.00", SplitType: "percentage"},
-					{UserID: otherUserID, AmountOwned: "40.00", SplitType: "percentage"},
+					{UserID: userID, Type: "percentage", Percentage: strPtr("60.00")},
+					{UserID: otherUserID, Type: "percentage", Percentage: strPtr("40.00")},
 				},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
@@ -532,8 +536,8 @@ func TestExpenseService_CreateExpense(t *testing.T) {
 				},
 				Splits: []SplitInput{
 					// Fixed unequal amounts: 100 + 50 = 150
-					{UserID: userID, AmountOwned: "100.00", SplitType: "fixed"},
-					{UserID: otherUserID, AmountOwned: "50.00", SplitType: "fixed"},
+					{UserID: userID, Type: "fixed", Amount: strPtr("100.00")},
+					{UserID: otherUserID, Type: "fixed", Amount: strPtr("50.00")},
 				},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
@@ -571,9 +575,9 @@ func TestExpenseService_CreateExpense(t *testing.T) {
 				},
 				Splits: []SplitInput{
 					// Equal split: 66.67 + 66.67 + 66.66 = 200 (rounded)
-					{UserID: userID, AmountOwned: "66.67", SplitType: "equal"},
-					{UserID: otherUserID, AmountOwned: "66.67", SplitType: "equal"},
-					{UserID: testutil.CreateTestUUID(3), AmountOwned: "66.66", SplitType: "equal"},
+					{UserID: userID, Type: "equal"},
+					{UserID: otherUserID, Type: "equal"},
+					{UserID: testutil.CreateTestUUID(3), Type: "equal"},
 				},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
@@ -611,9 +615,9 @@ func TestExpenseService_CreateExpense(t *testing.T) {
 				},
 				Splits: []SplitInput{
 					// Percentage split: 50% + 33.33% + 16.67% = 100%
-					{UserID: userID, AmountOwned: "150.00", SplitType: "percentage"},
-					{UserID: otherUserID, AmountOwned: "100.00", SplitType: "percentage"},
-					{UserID: testutil.CreateTestUUID(4), AmountOwned: "50.00", SplitType: "percentage"},
+					{UserID: userID, Type: "percentage", Percentage: strPtr("50.00")},
+					{UserID: otherUserID, Type: "percentage", Percentage: strPtr("33.33")},
+					{UserID: testutil.CreateTestUUID(4), Type: "percentage", Percentage: strPtr("16.67")},
 				},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
@@ -854,7 +858,7 @@ func TestExpenseService_UpdateExpense(t *testing.T) {
 				Date:      time.Now(),
 				UpdatedBy: userID,
 				Payments:  []PaymentInput{{UserID: userID, Amount: "100.00"}},
-				Splits:    []SplitInput{{UserID: userID, AmountOwned: "100.00"}},
+				Splits:    []SplitInput{{UserID: userID, Type: "equal"}},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
 				mock.GetExpenseByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Expense, error) {
@@ -872,7 +876,7 @@ func TestExpenseService_UpdateExpense(t *testing.T) {
 				Date:      time.Now(),
 				UpdatedBy: userID,
 				Payments:  []PaymentInput{{UserID: userID, Amount: "100.00"}},
-				Splits:    []SplitInput{{UserID: userID, AmountOwned: "100.00"}},
+				Splits:    []SplitInput{{UserID: userID, Type: "equal"}},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
 				mock.GetExpenseByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Expense, error) {
@@ -893,7 +897,7 @@ func TestExpenseService_UpdateExpense(t *testing.T) {
 				Date:      time.Now(),
 				UpdatedBy: userID,
 				Payments:  []PaymentInput{{UserID: userID, Amount: "100.00"}},
-				Splits:    []SplitInput{{UserID: userID, AmountOwned: "100.00"}},
+				Splits:    []SplitInput{{UserID: userID, Type: "equal"}},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
 				mock.GetExpenseByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Expense, error) {
@@ -914,7 +918,7 @@ func TestExpenseService_UpdateExpense(t *testing.T) {
 				Date:      time.Now(),
 				UpdatedBy: userID,
 				Payments:  []PaymentInput{{UserID: userID, Amount: "0"}},
-				Splits:    []SplitInput{{UserID: userID, AmountOwned: "0"}},
+				Splits:    []SplitInput{{UserID: userID, Type: "equal"}},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
 				mock.GetExpenseByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Expense, error) {
@@ -935,7 +939,7 @@ func TestExpenseService_UpdateExpense(t *testing.T) {
 				Date:      time.Now(),
 				UpdatedBy: userID,
 				Payments:  []PaymentInput{{UserID: userID, Amount: "-10.00"}},
-				Splits:    []SplitInput{{UserID: userID, AmountOwned: "-10.00"}},
+				Splits:    []SplitInput{{UserID: userID, Type: "equal"}},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
 				mock.GetExpenseByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Expense, error) {
@@ -956,7 +960,7 @@ func TestExpenseService_UpdateExpense(t *testing.T) {
 				Date:      time.Now(),
 				UpdatedBy: userID,
 				Payments:  []PaymentInput{},
-				Splits:    []SplitInput{{UserID: userID, AmountOwned: "100.00"}},
+				Splits:    []SplitInput{{UserID: userID, Type: "equal"}},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
 				mock.GetExpenseByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Expense, error) {
@@ -998,7 +1002,7 @@ func TestExpenseService_UpdateExpense(t *testing.T) {
 				Date:      time.Now(),
 				UpdatedBy: userID,
 				Payments:  []PaymentInput{{UserID: userID, Amount: "50.00"}},
-				Splits:    []SplitInput{{UserID: userID, AmountOwned: "100.00"}},
+				Splits:    []SplitInput{{UserID: userID, Type: "equal"}},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
 				mock.GetExpenseByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Expense, error) {
@@ -1019,7 +1023,7 @@ func TestExpenseService_UpdateExpense(t *testing.T) {
 				Date:      time.Now(),
 				UpdatedBy: userID,
 				Payments:  []PaymentInput{{UserID: userID, Amount: "150.00"}},
-				Splits:    []SplitInput{{UserID: userID, AmountOwned: "100.00"}},
+				Splits:    []SplitInput{{UserID: userID, Type: "equal"}},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
 				mock.GetExpenseByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Expense, error) {
@@ -1040,7 +1044,7 @@ func TestExpenseService_UpdateExpense(t *testing.T) {
 				Date:      time.Now(),
 				UpdatedBy: userID,
 				Payments:  []PaymentInput{{UserID: userID, Amount: "100.00"}},
-				Splits:    []SplitInput{{UserID: userID, AmountOwned: "50.00"}},
+				Splits:    []SplitInput{{UserID: userID, Type: "fixed", Amount: strPtr("50.00")}},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
 				mock.GetExpenseByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Expense, error) {
@@ -1061,7 +1065,7 @@ func TestExpenseService_UpdateExpense(t *testing.T) {
 				Date:      time.Now(),
 				UpdatedBy: userID,
 				Payments:  []PaymentInput{{UserID: userID, Amount: "100.00"}},
-				Splits:    []SplitInput{{UserID: userID, AmountOwned: "150.00"}},
+				Splits:    []SplitInput{{UserID: userID, Type: "fixed", Amount: strPtr("150.00")}},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
 				mock.GetExpenseByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Expense, error) {
@@ -1083,7 +1087,7 @@ func TestExpenseService_UpdateExpense(t *testing.T) {
 				UpdatedBy:    userID,
 				CurrencyCode: "",
 				Payments:     []PaymentInput{{UserID: userID, Amount: "100.00"}},
-				Splits:       []SplitInput{{UserID: userID, AmountOwned: "100.00"}},
+				Splits:       []SplitInput{{UserID: userID, Type: "equal"}},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
 				mock.GetExpenseByIDFunc = func(ctx context.Context, id pgtype.UUID) (sqlc.Expense, error) {
@@ -1108,8 +1112,8 @@ func TestExpenseService_UpdateExpense(t *testing.T) {
 				UpdatedBy: userID,
 				Payments:  []PaymentInput{{UserID: userID, Amount: "120.00"}},
 				Splits: []SplitInput{
-					{UserID: userID, AmountOwned: "60.00", SplitType: "equal"},
-					{UserID: otherUserID, AmountOwned: "60.00", SplitType: "equal"},
+					{UserID: userID, Type: "equal"},
+					{UserID: otherUserID, Type: "equal"},
 				},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
@@ -1153,8 +1157,8 @@ func TestExpenseService_UpdateExpense(t *testing.T) {
 					{UserID: otherUserID, Amount: "80.00"},
 				},
 				Splits: []SplitInput{
-					{UserID: userID, AmountOwned: "120.00", SplitType: "percentage"},
-					{UserID: otherUserID, AmountOwned: "80.00", SplitType: "percentage"},
+					{UserID: userID, Type: "percentage", Percentage: strPtr("60.00")},
+					{UserID: otherUserID, Type: "percentage", Percentage: strPtr("40.00")},
 				},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {
@@ -1195,8 +1199,8 @@ func TestExpenseService_UpdateExpense(t *testing.T) {
 				UpdatedBy: userID,
 				Payments:  []PaymentInput{{UserID: userID, Amount: "180.00"}},
 				Splits: []SplitInput{
-					{UserID: userID, AmountOwned: "120.00", SplitType: "fixed"},
-					{UserID: otherUserID, AmountOwned: "60.00", SplitType: "fixed"},
+					{UserID: userID, Type: "fixed", Amount: strPtr("120.00")},
+					{UserID: otherUserID, Type: "fixed", Amount: strPtr("60.00")},
 				},
 			},
 			mockSetup: func(mock *MockExpenseRepository) {

@@ -6,16 +6,17 @@ import (
 
 	"github.com/dhruvsaxena1998/splitplus/internal/http/handlers"
 	"github.com/dhruvsaxena1998/splitplus/internal/http/middleware"
+	"github.com/dhruvsaxena1998/splitplus/internal/repository"
 	"github.com/dhruvsaxena1998/splitplus/internal/service"
 )
 
-func WithSettlementRoutes(settlementService service.SettlementService) Option {
+func WithSettlementRoutes(settlementService service.SettlementService, jwtService service.JWTService, sessionRepo repository.SessionRepository) Option {
 	return optionFunc(func(r chi.Router) {
 		v := validator.New()
 
 		// All settlement routes require authentication
 		r.Route("/groups/{group_id}/settlements", func(r chi.Router) {
-			r.Use(middleware.RequireAuth)
+			r.Use(middleware.RequireAuth(jwtService, sessionRepo))
 
 			// GET /groups/{group_id}/settlements - List all settlements in group
 			r.Get("/", handlers.ListSettlementsByGroupHandler(settlementService))

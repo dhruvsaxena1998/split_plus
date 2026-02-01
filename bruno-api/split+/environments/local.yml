@@ -2,6 +2,14 @@ name: local
 variables:
   - name: base_url
     value: http://localhost:8080
+  - name: user_email
+    value: gauri@splitplus.com
+  - name: user_password
+    value: password123
+  - name: access_token
+    value: ""
+  - name: refresh_token
+    value: ""
   - name: user_id
     value: 9c9c52b3-f5c2-4cc1-88a2-e9c1799037d2
   - name: group_id

@@ -3,12 +3,13 @@ package router
 import (
 	"github.com/dhruvsaxena1998/splitplus/internal/http/handlers"
 	"github.com/dhruvsaxena1998/splitplus/internal/http/middleware"
+	"github.com/dhruvsaxena1998/splitplus/internal/repository"
 	"github.com/dhruvsaxena1998/splitplus/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
 )
 
-func WithExpenseCategoryRoutes(categoryService service.ExpenseCategoryService) Option {
+func WithExpenseCategoryRoutes(categoryService service.ExpenseCategoryService, jwtService service.JWTService, sessionRepo repository.SessionRepository) Option {
 	return optionFunc(func(r chi.Router) {
 		v := validator.New()
 
@@ -17,7 +18,7 @@ func WithExpenseCategoryRoutes(categoryService service.ExpenseCategoryService) O
 
 		// Group category routes - require authentication
 		r.Route("/groups/{group_id}/categories", func(r chi.Router) {
-			r.Use(middleware.RequireAuth)
+			r.Use(middleware.RequireAuth(jwtService, sessionRepo))
 
 			r.Get("/", handlers.ListGroupCategoriesHandler(categoryService))
 			r.Post("/", middleware.ValidateBody[handlers.CreateCategoryRequest](v)(handlers.CreateGroupCategoryHandler(categoryService)).ServeHTTP)

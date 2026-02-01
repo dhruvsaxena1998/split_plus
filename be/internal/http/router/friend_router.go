@@ -6,6 +6,7 @@ import (
 
 	"github.com/dhruvsaxena1998/splitplus/internal/http/handlers"
 	"github.com/dhruvsaxena1998/splitplus/internal/http/middleware"
+	"github.com/dhruvsaxena1998/splitplus/internal/repository"
 	"github.com/dhruvsaxena1998/splitplus/internal/service"
 )
 
@@ -13,12 +14,14 @@ func WithFriendRoutes(
 	friendService service.FriendService,
 	friendExpenseService service.FriendExpenseService,
 	friendSettlementService service.FriendSettlementService,
+	jwtService service.JWTService,
+	sessionRepo repository.SessionRepository,
 ) Option {
 	return optionFunc(func(r chi.Router) {
 		v := validator.New()
 
 		r.Group(func(r chi.Router) {
-			r.Use(middleware.RequireAuth)
+			r.Use(middleware.RequireAuth(jwtService, sessionRepo))
 
 			r.Route("/friends", func(r chi.Router) {
 				// Friend requests / contacts

@@ -14,11 +14,17 @@ import (
 )
 
 var (
-	ErrExpenseNotFound      = errors.New("expense not found")
-	ErrInvalidAmount        = errors.New("invalid amount")
-	ErrPaymentTotalMismatch = errors.New("payment total does not match expense amount")
-	ErrSplitTotalMismatch   = errors.New("split total does not match expense amount")
-	ErrCategoryNotInGroup   = errors.New("category does not belong to this group")
+	ErrExpenseNotFound         = errors.New("expense not found")
+	ErrInvalidAmount           = errors.New("invalid amount")
+	ErrPaymentTotalMismatch    = errors.New("payment total does not match expense amount")
+	ErrSplitTotalMismatch      = errors.New("split total does not match expense amount")
+	ErrCategoryNotInGroup      = errors.New("category does not belong to this group")
+	ErrPercentageTotalMismatch = errors.New("percentages must sum to 100")
+	ErrAmountRequired          = errors.New("amount required for fixed/custom splits")
+	ErrPercentageRequired      = errors.New("percentage required for percentage splits")
+	ErrSharesRequired          = errors.New("shares required and must be > 0 for shares splits")
+	ErrMixedSplitTypes         = errors.New("all splits must have the same type")
+	ErrInvalidSplitType        = errors.New("invalid split type")
 )
 
 type PaymentInput struct {
@@ -31,8 +37,19 @@ type PaymentInput struct {
 type SplitInput struct {
 	UserID        pgtype.UUID
 	PendingUserID *pgtype.UUID
-	AmountOwned   string
-	SplitType     string
+	Type          string
+	Percentage    *string
+	Shares        *int
+	Amount        *string
+}
+
+// calculatedSplit is the result after backend calculation
+type calculatedSplit struct {
+	UserID        pgtype.UUID
+	PendingUserID *pgtype.UUID
+	Type          string
+	Amount        string
+	ShareValue    *string
 }
 
 type CreateExpenseInput struct {
@@ -188,30 +205,6 @@ func (s *expenseService) validatePaymentsTotal(expenseAmount string, payments []
 	return nil
 }
 
-func (s *expenseService) validateSplitsTotal(expenseAmount string, splits []SplitInput) error {
-	expenseDecimal, err := decimal.NewFromString(expenseAmount)
-	if err != nil {
-		return ErrInvalidAmount
-	}
-
-	var total decimal.Decimal
-	for _, split := range splits {
-		amount, err := decimal.NewFromString(split.AmountOwned)
-		if err != nil {
-			return ErrInvalidAmount
-		}
-		if amount.LessThan(decimal.Zero) {
-			return ErrInvalidAmount
-		}
-		total = total.Add(amount)
-	}
-
-	if !total.Equal(expenseDecimal) {
-		return ErrSplitTotalMismatch
-	}
-
-	return nil
-}
 
 func (s *expenseService) validateCategory(ctx context.Context, categoryID *pgtype.UUID, groupID pgtype.UUID) error {
 	if categoryID == nil || !categoryID.Valid {
@@ -229,6 +222,181 @@ func (s *expenseService) validateCategory(ctx context.Context, categoryID *pgtyp
 	}
 
 	return nil
+}
+
+func calculateSplitAmounts(expenseAmount string, splits []SplitInput) ([]calculatedSplit, error) {
+	if len(splits) == 0 {
+		return nil, errors.New("at least one split is required")
+	}
+
+	// 1. Validate all splits have same type
+	splitType := splits[0].Type
+	for _, split := range splits {
+		if split.Type != splitType {
+			return nil, ErrMixedSplitTypes
+		}
+	}
+
+	// 2. Calculate based on type
+	switch splitType {
+	case "equal":
+		return calculateEqualSplits(expenseAmount, splits)
+	case "percentage":
+		return calculatePercentageSplits(expenseAmount, splits)
+	case "shares":
+		return calculateSharesSplits(expenseAmount, splits)
+	case "fixed", "custom":
+		return validateFixedSplits(expenseAmount, splits)
+	default:
+		return nil, ErrInvalidSplitType
+	}
+}
+
+func calculateEqualSplits(total string, splits []SplitInput) ([]calculatedSplit, error) {
+	totalDec, err := decimal.NewFromString(total)
+	if err != nil {
+		return nil, ErrInvalidAmount
+	}
+
+	count := len(splits)
+
+	// Calculate base amount (rounded down to 2 decimal places)
+	baseAmount := totalDec.Div(decimal.NewFromInt(int64(count))).Round(2)
+
+	// Calculate remainder to add to last split
+	allocatedTotal := baseAmount.Mul(decimal.NewFromInt(int64(count - 1)))
+	lastAmount := totalDec.Sub(allocatedTotal)
+
+	result := make([]calculatedSplit, count)
+	for i, split := range splits {
+		if i == count-1 {
+			result[i].Amount = lastAmount.String()
+		} else {
+			result[i].Amount = baseAmount.String()
+		}
+		result[i].UserID = split.UserID
+		result[i].PendingUserID = split.PendingUserID
+		result[i].Type = "equal"
+		result[i].ShareValue = nil
+	}
+	return result, nil
+}
+
+func calculatePercentageSplits(total string, splits []SplitInput) ([]calculatedSplit, error) {
+	totalDec, err := decimal.NewFromString(total)
+	if err != nil {
+		return nil, ErrInvalidAmount
+	}
+
+	// Validate percentages sum to 100
+	var percentageSum decimal.Decimal
+	for _, split := range splits {
+		if split.Percentage == nil {
+			return nil, ErrPercentageRequired
+		}
+		pct, err := decimal.NewFromString(*split.Percentage)
+		if err != nil || pct.LessThanOrEqual(decimal.Zero) {
+			return nil, ErrInvalidAmount
+		}
+		percentageSum = percentageSum.Add(pct)
+	}
+	if !percentageSum.Equal(decimal.NewFromInt(100)) {
+		return nil, ErrPercentageTotalMismatch
+	}
+
+	// Calculate amounts, adjust last for rounding
+	result := make([]calculatedSplit, len(splits))
+	var allocatedTotal decimal.Decimal
+
+	for i, split := range splits {
+		pct, _ := decimal.NewFromString(*split.Percentage)
+
+		if i == len(splits)-1 {
+			// Last split gets remainder
+			result[i].Amount = totalDec.Sub(allocatedTotal).String()
+		} else {
+			amount := totalDec.Mul(pct).Div(decimal.NewFromInt(100)).Round(2)
+			result[i].Amount = amount.String()
+			allocatedTotal = allocatedTotal.Add(amount)
+		}
+		result[i].UserID = split.UserID
+		result[i].PendingUserID = split.PendingUserID
+		result[i].Type = "percentage"
+		result[i].ShareValue = split.Percentage
+	}
+	return result, nil
+}
+
+func calculateSharesSplits(total string, splits []SplitInput) ([]calculatedSplit, error) {
+	totalDec, err := decimal.NewFromString(total)
+	if err != nil {
+		return nil, ErrInvalidAmount
+	}
+
+	// Calculate total shares
+	var totalShares int64
+	for _, split := range splits {
+		if split.Shares == nil || *split.Shares <= 0 {
+			return nil, ErrSharesRequired
+		}
+		totalShares += int64(*split.Shares)
+	}
+
+	// Calculate amounts based on share proportion
+	result := make([]calculatedSplit, len(splits))
+	var allocatedTotal decimal.Decimal
+
+	for i, split := range splits {
+		if i == len(splits)-1 {
+			// Last split gets remainder to ensure exact total
+			result[i].Amount = totalDec.Sub(allocatedTotal).String()
+		} else {
+			// amount = total * (shares / totalShares)
+			shareRatio := decimal.NewFromInt(int64(*split.Shares)).Div(decimal.NewFromInt(totalShares))
+			amount := totalDec.Mul(shareRatio).Round(2)
+			result[i].Amount = amount.String()
+			allocatedTotal = allocatedTotal.Add(amount)
+		}
+		result[i].UserID = split.UserID
+		result[i].PendingUserID = split.PendingUserID
+		result[i].Type = "shares"
+		shareValueStr := decimal.NewFromInt(int64(*split.Shares)).String()
+		result[i].ShareValue = &shareValueStr
+	}
+	return result, nil
+}
+
+func validateFixedSplits(total string, splits []SplitInput) ([]calculatedSplit, error) {
+	totalDec, err := decimal.NewFromString(total)
+	if err != nil {
+		return nil, ErrInvalidAmount
+	}
+
+	var splitSum decimal.Decimal
+	result := make([]calculatedSplit, len(splits))
+
+	for i, split := range splits {
+		if split.Amount == nil {
+			return nil, ErrAmountRequired
+		}
+		amount, err := decimal.NewFromString(*split.Amount)
+		if err != nil || amount.LessThan(decimal.Zero) {
+			return nil, ErrInvalidAmount
+		}
+		splitSum = splitSum.Add(amount)
+
+		result[i].UserID = split.UserID
+		result[i].PendingUserID = split.PendingUserID
+		result[i].Amount = *split.Amount
+		result[i].Type = split.Type
+		result[i].ShareValue = nil
+	}
+
+	if !splitSum.Equal(totalDec) {
+		return nil, ErrSplitTotalMismatch
+	}
+
+	return result, nil
 }
 
 func (s *expenseService) CreateExpense(ctx context.Context, input CreateExpenseInput) (CreateExpenseResult, error) {
@@ -263,11 +431,9 @@ func (s *expenseService) CreateExpense(ctx context.Context, input CreateExpenseI
 		return CreateExpenseResult{}, err
 	}
 
-	// Validate splits
-	if len(input.Splits) == 0 {
-		return CreateExpenseResult{}, errors.New("at least one split is required")
-	}
-	if err := s.validateSplitsTotal(input.Amount, input.Splits); err != nil {
+	// Calculate split amounts
+	calculatedSplits, err := calculateSplitAmounts(input.Amount, input.Splits)
+	if err != nil {
 		return CreateExpenseResult{}, err
 	}
 
@@ -359,34 +525,38 @@ func (s *expenseService) CreateExpense(ctx context.Context, input CreateExpenseI
 		payments = append(payments, payment)
 	}
 
-	// Create splits
-	splits := make([]sqlc.ExpenseSplit, 0, len(input.Splits))
-	for _, splitInput := range input.Splits {
-		splitAmount, err := stringToNumeric(splitInput.AmountOwned)
+	// Create splits using calculated amounts
+	splits := make([]sqlc.ExpenseSplit, 0, len(calculatedSplits))
+	for _, calcSplit := range calculatedSplits {
+		splitAmount, err := stringToNumeric(calcSplit.Amount)
 		if err != nil {
 			return CreateExpenseResult{}, ErrInvalidAmount
 		}
 
-		splitType := strings.TrimSpace(splitInput.SplitType)
-		if splitType == "" {
-			splitType = "equal"
-		}
-
 		var pendingUserID pgtype.UUID
-		if splitInput.PendingUserID != nil {
-			pendingUserID = *splitInput.PendingUserID
+		if calcSplit.PendingUserID != nil {
+			pendingUserID = *calcSplit.PendingUserID
 		}
 
-		if !splitInput.UserID.Valid && !pendingUserID.Valid {
+		if !calcSplit.UserID.Valid && !pendingUserID.Valid {
 			return CreateExpenseResult{}, errors.New("split must have user_id or pending_user_id")
+		}
+
+		var shareValue pgtype.Numeric
+		if calcSplit.ShareValue != nil {
+			shareValue, err = stringToNumeric(*calcSplit.ShareValue)
+			if err != nil {
+				return CreateExpenseResult{}, ErrInvalidAmount
+			}
 		}
 
 		split, err := txRepo.CreateExpenseSplit(ctx, sqlc.CreateExpenseSplitParams{
 			ExpenseID:     expense.ID,
-			UserID:        splitInput.UserID,
+			UserID:        calcSplit.UserID,
 			PendingUserID: pendingUserID,
 			AmountOwned:   splitAmount,
-			SplitType:     splitType,
+			SplitType:     calcSplit.Type,
+			ShareValue:    shareValue,
 		})
 		if err != nil {
 			return CreateExpenseResult{}, err
@@ -474,11 +644,9 @@ func (s *expenseService) UpdateExpense(ctx context.Context, input UpdateExpenseI
 		return CreateExpenseResult{}, err
 	}
 
-	// Validate splits
-	if len(input.Splits) == 0 {
-		return CreateExpenseResult{}, errors.New("at least one split is required")
-	}
-	if err := s.validateSplitsTotal(input.Amount, input.Splits); err != nil {
+	// Calculate split amounts
+	calculatedSplits, err := calculateSplitAmounts(input.Amount, input.Splits)
+	if err != nil {
 		return CreateExpenseResult{}, err
 	}
 
@@ -587,34 +755,38 @@ func (s *expenseService) UpdateExpense(ctx context.Context, input UpdateExpenseI
 		payments = append(payments, payment)
 	}
 
-	// Create new splits
-	splits := make([]sqlc.ExpenseSplit, 0, len(input.Splits))
-	for _, splitInput := range input.Splits {
-		splitAmount, err := stringToNumeric(splitInput.AmountOwned)
+	// Create new splits using calculated amounts
+	splits := make([]sqlc.ExpenseSplit, 0, len(calculatedSplits))
+	for _, calcSplit := range calculatedSplits {
+		splitAmount, err := stringToNumeric(calcSplit.Amount)
 		if err != nil {
 			return CreateExpenseResult{}, ErrInvalidAmount
 		}
 
-		splitType := strings.TrimSpace(splitInput.SplitType)
-		if splitType == "" {
-			splitType = "equal"
-		}
-
 		var pendingUserID pgtype.UUID
-		if splitInput.PendingUserID != nil {
-			pendingUserID = *splitInput.PendingUserID
+		if calcSplit.PendingUserID != nil {
+			pendingUserID = *calcSplit.PendingUserID
 		}
 
-		if !splitInput.UserID.Valid && !pendingUserID.Valid {
+		if !calcSplit.UserID.Valid && !pendingUserID.Valid {
 			return CreateExpenseResult{}, errors.New("split must have user_id or pending_user_id")
 		}
 
+		var shareValue pgtype.Numeric
+		if calcSplit.ShareValue != nil {
+			shareValue, err = stringToNumeric(*calcSplit.ShareValue)
+			if err != nil {
+				return CreateExpenseResult{}, ErrInvalidAmount
+			}
+		}
+
 		split, err := txRepo.CreateExpenseSplit(ctx, sqlc.CreateExpenseSplitParams{
-			ExpenseID:   updatedExpense.ID,
-			UserID:      splitInput.UserID,
+			ExpenseID:     updatedExpense.ID,
+			UserID:        calcSplit.UserID,
 			PendingUserID: pendingUserID,
-			AmountOwned: splitAmount,
-			SplitType:   splitType,
+			AmountOwned:   splitAmount,
+			SplitType:     calcSplit.Type,
+			ShareValue:    shareValue,
 		})
 		if err != nil {
 			return CreateExpenseResult{}, err

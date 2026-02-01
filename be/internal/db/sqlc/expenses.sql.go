@@ -100,8 +100,8 @@ func (q *Queries) CreateExpensePayment(ctx context.Context, arg CreateExpensePay
 }
 
 const createExpenseSplit = `-- name: CreateExpenseSplit :one
-INSERT INTO expense_split (expense_id, user_id, pending_user_id, amount_owned, split_type)
-VALUES ($1, $2, $3, $4, $5) RETURNING id, expense_id, user_id, amount_owned, split_type, created_at, updated_at, deleted_at, pending_user_id
+INSERT INTO expense_split (expense_id, user_id, pending_user_id, amount_owned, split_type, share_value)
+VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, expense_id, user_id, amount_owned, split_type, created_at, updated_at, deleted_at, pending_user_id, share_value
 `
 
 type CreateExpenseSplitParams struct {
@@ -110,6 +110,7 @@ type CreateExpenseSplitParams struct {
 	PendingUserID pgtype.UUID    `json:"pending_user_id"`
 	AmountOwned   pgtype.Numeric `json:"amount_owned"`
 	SplitType     string         `json:"split_type"`
+	ShareValue    pgtype.Numeric `json:"share_value"`
 }
 
 func (q *Queries) CreateExpenseSplit(ctx context.Context, arg CreateExpenseSplitParams) (ExpenseSplit, error) {
@@ -119,6 +120,7 @@ func (q *Queries) CreateExpenseSplit(ctx context.Context, arg CreateExpenseSplit
 		arg.PendingUserID,
 		arg.AmountOwned,
 		arg.SplitType,
+		arg.ShareValue,
 	)
 	var i ExpenseSplit
 	err := row.Scan(
@@ -131,6 +133,7 @@ func (q *Queries) CreateExpenseSplit(ctx context.Context, arg CreateExpenseSplit
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.PendingUserID,
+		&i.ShareValue,
 	)
 	return i, err
 }
@@ -276,6 +279,7 @@ SELECT
     es.pending_user_id,
     es.amount_owned,
     es.split_type,
+    es.share_value,
     es.created_at,
     es.updated_at,
     u.email AS user_email,
@@ -297,6 +301,7 @@ type ListExpenseSplitsRow struct {
 	PendingUserID    pgtype.UUID        `json:"pending_user_id"`
 	AmountOwned      pgtype.Numeric     `json:"amount_owned"`
 	SplitType        string             `json:"split_type"`
+	ShareValue       pgtype.Numeric     `json:"share_value"`
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 	UserEmail        pgtype.Text        `json:"user_email"`
@@ -322,6 +327,7 @@ func (q *Queries) ListExpenseSplits(ctx context.Context, expenseID pgtype.UUID) 
 			&i.PendingUserID,
 			&i.AmountOwned,
 			&i.SplitType,
+			&i.ShareValue,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.UserEmail,
@@ -612,7 +618,7 @@ SET amount_owned = $3,
     split_type = $4,
     updated_at = CURRENT_TIMESTAMP
 WHERE expense_id = $1 AND user_id = $2 AND deleted_at IS NULL
-RETURNING id, expense_id, user_id, amount_owned, split_type, created_at, updated_at, deleted_at, pending_user_id
+RETURNING id, expense_id, user_id, amount_owned, split_type, created_at, updated_at, deleted_at, pending_user_id, share_value
 `
 
 type UpdateExpenseSplitParams struct {
@@ -640,6 +646,7 @@ func (q *Queries) UpdateExpenseSplit(ctx context.Context, arg UpdateExpenseSplit
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.PendingUserID,
+		&i.ShareValue,
 	)
 	return i, err
 }

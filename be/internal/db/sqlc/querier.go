@@ -11,6 +11,7 @@ import (
 )
 
 type Querier interface {
+	BlacklistToken(ctx context.Context, arg BlacklistTokenParams) error
 	CountExpenseComments(ctx context.Context, expenseID pgtype.UUID) (int64, error)
 	CreateExpense(ctx context.Context, arg CreateExpenseParams) (Expense, error)
 	CreateExpenseComment(ctx context.Context, arg CreateExpenseCommentParams) (ExpenseComment, error)
@@ -26,16 +27,22 @@ type Querier interface {
 	CreateRecurringExpense(ctx context.Context, arg CreateRecurringExpenseParams) (RecurringExpense, error)
 	CreateRecurringExpensePayment(ctx context.Context, arg CreateRecurringExpensePaymentParams) (RecurringExpensePayment, error)
 	CreateRecurringExpenseSplit(ctx context.Context, arg CreateRecurringExpenseSplitParams) (RecurringExpenseSplit, error)
+	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateSettlement(ctx context.Context, arg CreateSettlementParams) (Settlement, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeleteAllUserSessions(ctx context.Context, userID pgtype.UUID) error
 	DeleteExpense(ctx context.Context, id pgtype.UUID) error
 	DeleteExpenseComment(ctx context.Context, id pgtype.UUID) error
 	DeleteExpensePayments(ctx context.Context, expenseID pgtype.UUID) error
 	DeleteExpenseSplits(ctx context.Context, expenseID pgtype.UUID) error
+	DeleteExpiredBlacklistedTokens(ctx context.Context) error
+	DeleteExpiredSessions(ctx context.Context) error
 	DeleteFriendship(ctx context.Context, id pgtype.UUID) error
 	DeleteGroupCategory(ctx context.Context, arg DeleteGroupCategoryParams) error
 	DeleteRecurringExpense(ctx context.Context, id pgtype.UUID) error
+	DeleteSession(ctx context.Context, refreshTokenHash string) error
 	DeleteSettlement(ctx context.Context, id pgtype.UUID) error
+	GetActiveSessionsByUserID(ctx context.Context, userID pgtype.UUID) ([]Session, error)
 	GetCategoryByID(ctx context.Context, id pgtype.UUID) (ExpenseCategory, error)
 	GetCategoryBySlug(ctx context.Context, arg GetCategoryBySlugParams) (ExpenseCategory, error)
 	GetExpenseByID(ctx context.Context, id pgtype.UUID) (Expense, error)
@@ -59,11 +66,13 @@ type Querier interface {
 	GetPendingUserByID(ctx context.Context, id pgtype.UUID) (PendingUser, error)
 	GetRecurringExpenseByID(ctx context.Context, id pgtype.UUID) (RecurringExpense, error)
 	GetRecurringExpensesDue(ctx context.Context) ([]RecurringExpense, error)
+	GetSessionByRefreshTokenHash(ctx context.Context, refreshTokenHash string) (Session, error)
 	GetSettlementByID(ctx context.Context, id pgtype.UUID) (Settlement, error)
 	// Get balance for a specific user in a group
 	GetUserBalanceInGroup(ctx context.Context, arg GetUserBalanceInGroupParams) (GetUserBalanceInGroupRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
+	IsTokenBlacklisted(ctx context.Context, tokenJti string) (bool, error)
 	ListCategoriesForGroup(ctx context.Context, groupID pgtype.UUID) ([]ExpenseCategory, error)
 	ListExpenseComments(ctx context.Context, expenseID pgtype.UUID) ([]ListExpenseCommentsRow, error)
 	ListExpensePayments(ctx context.Context, expenseID pgtype.UUID) ([]ListExpensePaymentsRow, error)
@@ -95,6 +104,7 @@ type Querier interface {
 	UpdatePendingSplitUserID(ctx context.Context, arg UpdatePendingSplitUserIDParams) error
 	UpdateRecurringExpense(ctx context.Context, arg UpdateRecurringExpenseParams) (RecurringExpense, error)
 	UpdateRecurringExpenseActiveStatus(ctx context.Context, arg UpdateRecurringExpenseActiveStatusParams) (RecurringExpense, error)
+	UpdateSessionLastUsed(ctx context.Context, id pgtype.UUID) error
 	UpdateSettlement(ctx context.Context, arg UpdateSettlementParams) (Settlement, error)
 	UpdateSettlementStatus(ctx context.Context, arg UpdateSettlementStatusParams) (Settlement, error)
 }

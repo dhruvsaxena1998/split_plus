@@ -131,9 +131,11 @@ func CreateRecurringExpenseHandler(recurringExpenseService service.RecurringExpe
 				return
 			}
 			splits[i] = service.RecurringSplitInput{
-				UserID:      splitUserID,
-				AmountOwned: s.AmountOwned,
-				SplitType:   s.SplitType,
+				UserID:     splitUserID,
+				Type:       s.Type,
+				Percentage: s.Percentage,
+				Shares:     s.Shares,
+				Amount:     s.Amount,
 			}
 		}
 
@@ -302,9 +304,11 @@ func UpdateRecurringExpenseHandler(recurringExpenseService service.RecurringExpe
 				return
 			}
 			splits[i] = service.RecurringSplitInput{
-				UserID:      splitUserID,
-				AmountOwned: s.AmountOwned,
-				SplitType:   s.SplitType,
+				UserID:     splitUserID,
+				Type:       s.Type,
+				Percentage: s.Percentage,
+				Shares:     s.Shares,
+				Amount:     s.Amount,
 			}
 		}
 

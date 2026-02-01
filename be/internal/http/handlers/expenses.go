@@ -24,10 +24,12 @@ type PaymentRequest struct {
 }
 
 type SplitRequest struct {
-	UserID        string `json:"user_id,omitempty" validate:"omitempty,uuid"`
-	PendingUserID string `json:"pending_user_id,omitempty" validate:"omitempty,uuid"`
-	AmountOwned   string `json:"amount_owned" validate:"required"`
-	SplitType     string `json:"split_type,omitempty"`
+	UserID        string  `json:"user_id,omitempty" validate:"omitempty,uuid"`
+	PendingUserID string  `json:"pending_user_id,omitempty" validate:"omitempty,uuid"`
+	Type          string  `json:"type" validate:"required,oneof=equal percentage shares fixed custom"`
+	Percentage    *string `json:"percentage,omitempty"`
+	Shares        *int    `json:"shares,omitempty"`
+	Amount        *string `json:"amount,omitempty"`
 }
 
 type CreateExpenseRequest struct {
@@ -91,6 +93,7 @@ type SplitResponse struct {
 	PendingUserID *pgtype.UUID `json:"pending_user_id,omitempty"`
 	AmountOwned   string       `json:"amount_owned"`
 	SplitType     string       `json:"split_type"`
+	ShareValue    *string      `json:"share_value,omitempty"`
 	CreatedAt     string       `json:"created_at"`
 	User          UserInfo     `json:"user,omitempty"`
 	PendingUser   *UserInfo    `json:"pending_user,omitempty"`
@@ -195,8 +198,10 @@ func CreateExpenseHandler(expenseService service.ExpenseService) http.HandlerFun
 			splits[i] = service.SplitInput{
 				UserID:        userID,
 				PendingUserID: pendingUserID,
-				AmountOwned:   s.AmountOwned,
-				SplitType:     s.SplitType,
+				Type:          s.Type,
+				Percentage:    s.Percentage,
+				Shares:        s.Shares,
+				Amount:        s.Amount,
 			}
 		}
 
@@ -233,7 +238,9 @@ func CreateExpenseHandler(expenseService service.ExpenseService) http.HandlerFun
 				statusCode = http.StatusForbidden
 			case service.ErrCategoryNotFound, service.ErrCategoryNotInGroup:
 				statusCode = http.StatusBadRequest
-			case service.ErrInvalidAmount, service.ErrPaymentTotalMismatch, service.ErrSplitTotalMismatch:
+			case service.ErrInvalidAmount, service.ErrPaymentTotalMismatch, service.ErrSplitTotalMismatch,
+				service.ErrPercentageTotalMismatch, service.ErrAmountRequired, service.ErrPercentageRequired,
+				service.ErrSharesRequired, service.ErrMixedSplitTypes, service.ErrInvalidSplitType:
 				statusCode = http.StatusUnprocessableEntity
 			}
 			response.SendError(w, statusCode, err.Error())
@@ -478,8 +485,10 @@ func UpdateExpenseHandler(expenseService service.ExpenseService) http.HandlerFun
 			splits[i] = service.SplitInput{
 				UserID:        splitUserID,
 				PendingUserID: pendingUserID,
-				AmountOwned:   s.AmountOwned,
-				SplitType:     s.SplitType,
+				Type:          s.Type,
+				Percentage:    s.Percentage,
+				Shares:        s.Shares,
+				Amount:        s.Amount,
 			}
 		}
 
@@ -516,7 +525,9 @@ func UpdateExpenseHandler(expenseService service.ExpenseService) http.HandlerFun
 				statusCode = http.StatusForbidden
 			case service.ErrCategoryNotFound, service.ErrCategoryNotInGroup:
 				statusCode = http.StatusBadRequest
-			case service.ErrInvalidAmount, service.ErrPaymentTotalMismatch, service.ErrSplitTotalMismatch:
+			case service.ErrInvalidAmount, service.ErrPaymentTotalMismatch, service.ErrSplitTotalMismatch,
+				service.ErrPercentageTotalMismatch, service.ErrAmountRequired, service.ErrPercentageRequired,
+				service.ErrSharesRequired, service.ErrMixedSplitTypes, service.ErrInvalidSplitType:
 				statusCode = http.StatusUnprocessableEntity
 			}
 			response.SendError(w, statusCode, err.Error())
@@ -863,6 +874,12 @@ func splitsWithUserToResponse(splits []sqlc.ListExpenseSplitsRow) []SplitRespons
 			}
 		}
 
+		var shareValue *string
+		if s.ShareValue.Valid {
+			val, _ := numericToString(s.ShareValue)
+			shareValue = &val
+		}
+
 		resp[i] = SplitResponse{
 			ID:            s.ID,
 			ExpenseID:     s.ExpenseID,
@@ -870,6 +887,7 @@ func splitsWithUserToResponse(splits []sqlc.ListExpenseSplitsRow) []SplitRespons
 			PendingUserID: pendingUserID,
 			AmountOwned:   amount,
 			SplitType:     s.SplitType,
+			ShareValue:    shareValue,
 			CreatedAt:     formatTimestamp(s.CreatedAt),
 			User: UserInfo{
 				Email:     s.UserEmail.String,

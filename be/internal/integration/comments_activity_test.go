@@ -28,8 +28,8 @@ func TestCommentsAndActivityFlow(t *testing.T) {
 			{UserID: userA.ID, Amount: "20.00"},
 		},
 		Splits: []splitPayload{
-			{UserID: userA.ID, AmountOwned: "10.00", SplitType: "equal"},
-			{UserID: userB.ID, AmountOwned: "10.00", SplitType: "equal"},
+			{UserID: userA.ID, Type: "equal"},
+			{UserID: userB.ID, Type: "equal"},
 		},
 	})
 
@@ -42,7 +42,7 @@ func TestCommentsAndActivityFlow(t *testing.T) {
 	// 6) Update Expense (Should log 'expense_updated')
 	// We'll update amount to 22.00
 	newAmount := "22.00"
-	half := "11.00"
+	// half := "11.00" // Unused
 	updatePayload := createExpensePayload{
 		Title:  "Lunch Updated",
 		Amount: newAmount,
@@ -51,8 +51,8 @@ func TestCommentsAndActivityFlow(t *testing.T) {
 			{UserID: userA.ID, Amount: newAmount},
 		},
 		Splits: []splitPayload{
-			{UserID: userA.ID, AmountOwned: half, SplitType: "equal"},
-			{UserID: userB.ID, AmountOwned: half, SplitType: "equal"},
+			{UserID: userA.ID, Type: "equal"},
+			{UserID: userB.ID, Type: "equal"},
 		},
 	}
 
